@@ -1,29 +1,35 @@
 name: Fetch Blocked Content
 
 on:
-  workflow_dispatch:        # اجرای دستی
+  workflow_dispatch:
     inputs:
       url:
         description: 'آدرس مورد نظر'
         required: true
         default: 'https://example.com'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # برای رفع اخطار Node.js (اختیاری)
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write          # اجازه push به مخزن
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Fetch the URL
+      - name: Fetch the URL (overwrite file)
         run: |
           curl -s -L "${{ github.event.inputs.url }}" > fetched_content.html
           echo "Fetched at $(date)" >> fetched_content.html
 
-      - name: Commit and push
+      - name: Commit and push (with pull first)
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+          git pull origin main --rebase   # اول هماهنگ می‌شود
           git add fetched_content.html
-          git commit -m "Update fetched content for ${{ github.event.inputs.url }}" || echo "No changes"
-          git push
+          git commit -m "Update: ${{ github.event.inputs.url }}" || echo "No changes"
+          git push origin main
