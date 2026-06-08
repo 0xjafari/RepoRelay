@@ -4,32 +4,48 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: 'آدرس مورد نظر'
+        description: 'آدرس مورد نظر (مثال: https://example.com)'
         required: true
         default: 'https://example.com'
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # برای رفع اخطار Node.js (اختیاری)
+  # اختیاری: رفع اخطار Node.js 20 (تأثیر منفی روی اجرا ندارد)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
     permissions:
-      contents: write          # اجازه push به مخزن
+      contents: write   # اجازه push به مخزن (جایگزین تنظیم دستی در Settings)
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Fetch the URL (overwrite file)
+      - name: Fetch content from URL (overwrite file)
         run: |
           curl -s -L "${{ github.event.inputs.url }}" > fetched_content.html
-          echo "Fetched at $(date)" >> fetched_content.html
+          echo "" >> fetched_content.html
+          echo "<!-- Fetched at $(date) from ${{ github.event.inputs.url }} -->" >> fetched_content.html
 
-      - name: Commit and push (with pull first)
+      - name: Commit and push changes (safe rebase)
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git pull origin main --rebase   # اول هماهنگ می‌شود
+          
+          # مرحله 1: اضافه کردن فایل (stage)
           git add fetched_content.html
-          git commit -m "Update: ${{ github.event.inputs.url }}" || echo "No changes"
+          
+          # مرحله 2: بررسی وجود تغییر واقعی
+          if git diff --cached --quiet; then
+            echo "No changes detected. Nothing to commit."
+            exit 0
+          fi
+          
+          # مرحله 3: commit تغییرات محلی
+          git commit -m "Update fetched content from ${{ github.event.inputs.url }}"
+          
+          # مرحله 4: دریافت آخرین تغییرات راه‌دور و rebase کامیت محلی روی آن
+          git pull --rebase origin main
+          
+          # مرحله 5: ارسال به مخزن راه‌دور
           git push origin main
