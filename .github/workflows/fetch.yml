@@ -1,0 +1,29 @@
+name: Fetch Blocked Content
+
+on:
+  workflow_dispatch:        # اجرای دستی
+    inputs:
+      url:
+        description: 'آدرس مورد نظر'
+        required: true
+        default: 'https://example.com'
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch the URL
+        run: |
+          curl -s -L "${{ github.event.inputs.url }}" > fetched_content.html
+          echo "Fetched at $(date)" >> fetched_content.html
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add fetched_content.html
+          git commit -m "Update fetched content for ${{ github.event.inputs.url }}" || echo "No changes"
+          git push
